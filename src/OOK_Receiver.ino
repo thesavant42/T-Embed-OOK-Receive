@@ -5,46 +5,32 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <ArduinoLog.h>
-// rtl_433_ESP needs to be on HSPI, not VSPI (default)
+// Load custom rtl_433_ESP, needs to be on HSPI, not VSPI (default)
 #include <rtl_433_ESP.h>
 //added TFTHelper.h
+#include <vector>
+#include <TFT_eSPI.h>
 #include "TFTHelper.h"
-#include <OneButton.h>
-
-//#include <images.h>
+//#include <OneButton.h>
+// SPIFFS fs for fonts
+#include <FS.h>
 
 #ifndef RF_MODULE_FREQUENCY
 #  define RF_MODULE_FREQUENCY 433.92
 #endif
 
 #define JSON_MSG_BUFFER 512
+#define AA_FONT_SMALL "NotoSansBold15"
 
-TFT_eSprite spr = TFT_eSprite(&tft);
-TFT_eSprite sprTitle = TFT_eSprite(&tft);
-TFT_eSprite nfcSpr = TFT_eSprite(&tft);
 OneButton button(BOARD_ENCODE_CENTEN_PIN, true);
 
-int spr_w = 0;
-int spr_h = 0;
-int spr_start_x = 0;
-int spr_start_y = 0;
-int start_x ;
-int title_h ;
-SemaphoreHandle_t radioLock;
+//SemaphoreHandle_t radioLock;
 
 char messageBuffer[JSON_MSG_BUFFER];
 
 rtl_433_ESP rf; // use -1 to disable transmitter
 
 int count = 0;
-
-void buttonLoop(void *)
-{
-    while (1) {
-        button.tick();
-        delay(5);
-    }
-}
 
 void rtl_433_Callback(char* message) {
   DynamicJsonBuffer jsonBuffer2(JSON_MSG_BUFFER);
@@ -65,20 +51,45 @@ void logJson(JsonObject& jsondata) {
   Log.notice(F("."));
   Log.setShowLevel(true);
 #else
-  Log.notice(F("Received message : %s" CR), JSONmessageBuffer);
-  tft.print("Received message : %s" CR), JSONmessageBuffer;
+  Log.notice(F("Received message: %s" CR), JSONmessageBuffer);
+  tft.fillScreen(TFT_BLACK);
+  tft.setCursor(0, 0, 4);
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  tft.println(JSONmessageBuffer);
 #endif
 }
 
 void setup() {
-    // BEGIN SAVANT CHANGE BLOCK
+    if (!SPIFFS.begin()) {
+      Serial.println("SPIFFS initialisation failed!");
+      while (1) yield(); // Stay here twiddling thumbs waiting
+    }
+    Serial.println("\r\nSPIFFS available!");
+  
+    // ESP32 will crash if any of the fonts are missing
+    bool font_missing = false;
+    if (SPIFFS.exists("/NotoSansBold15.vlw")    == false) font_missing = true;
+    if (SPIFFS.exists("/NotoSansBold36.vlw")    == false) font_missing = true;
+
+    if (font_missing)
+    {
+      Serial.println("\r\nFont missing in SPIFFS, did you upload it?");
+      while(1) yield();
+    }
+      else Serial.println("\r\nFonts found OK."); 
     // Initialize display screen
-    initTFT();
-    spr_w = tft.width();
-    spr_h = tft.width() / 3;
-    // init radios
-    initHSPI();
-    // END SAVANT CHANGE BLOCK
+  initTFT();
+  pinMode(BOARD_TFT_BL, OUTPUT);
+  digitalWrite(BOARD_TFT_BL, HIGH);
+  tft.setCursor(0, 0, 4);
+  tft.loadFont(AA_FONT_SMALL); // Must load the font first
+  // Set the font colour to be white with a black background
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  // We can now plot text on screen using the "print" class
+  tft.println("Intialized default\n");
+  tft.fillScreen(TFT_BLACK);
+  // init radios
+  initHSPI();
   Serial.begin(921600);
   delay(1000);
 #ifndef LOG_LEVEL
@@ -180,3 +191,11 @@ void loop() {
   }
 #endif
 }
+
+//void buttonLoop(void *)
+//{
+//    while (1) {
+//        button.tick();
+//        delay(5);
+//    }
+//}
