@@ -6,3 +6,4 @@
 .vscode/*
 *.code-workspace
 compile_commands.json
+src/secrets.h

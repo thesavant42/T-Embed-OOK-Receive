@@ -14,6 +14,10 @@
 #include <OneButton.h>
 // SPIFFS fs for fonts
 #include <FS.h>
+#include <WiFi.h>
+#include "WiFiClientSecure.h"
+#include "Adafruit_MQTT.h"
+#include "Adafruit_MQTT_Client.h"
 
 #ifndef RF_MODULE_FREQUENCY
 #  define RF_MODULE_FREQUENCY 433.92
@@ -69,7 +73,7 @@ void setup() {
     // ESP32 will crash if any of the fonts are missing
     bool font_missing = false;
     if (SPIFFS.exists("/NotoSansBold15.vlw")    == false) font_missing = true;
-    if (SPIFFS.exists("/NotoSansBold36.vlw")    == false) font_missing = true;
+    //if (SPIFFS.exists("/NotoSansBold36.vlw")    == false) font_missing = true;
 
     if (font_missing)
     {
