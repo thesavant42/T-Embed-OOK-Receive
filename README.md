@@ -1,3 +1,5 @@
+![Alt text](images/IMG_2521.jpg?raw=true "OOKRX")
+
 This is a sample implementation of the rtl_433_ESP library with the CC1101 Transceiver Module. This fork has been patched for the Lilygo T-Embed
 
 
@@ -7,9 +9,7 @@ T-Embed's backpack uses a custom SPI. This has been handle automatically via the
 
 # Sample Outputs
 
-## CC1101 Device (on Taserface)
-
-
+## CC1101 Device
 ```
 �N:  
 N: ****** setup ******
