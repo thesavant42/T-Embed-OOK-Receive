@@ -11,7 +11,7 @@
 #include <vector>
 #include <TFT_eSPI.h>
 #include "TFTHelper.h"
-//#include <OneButton.h>
+#include <OneButton.h>
 // SPIFFS fs for fonts
 #include <FS.h>
 
@@ -192,10 +192,10 @@ void loop() {
 #endif
 }
 
-//void buttonLoop(void *)
-//{
-//    while (1) {
-//        button.tick();
-//        delay(5);
-//    }
-//}
+void buttonLoop(void *)
+{
+    while (1) {
+        button.tick();
+        delay(5);
+    }
+}
