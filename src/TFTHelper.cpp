@@ -89,10 +89,11 @@ void initTFT()
     // begin savant code block
     pinMode(BOARD_POWER_ON_PIN, OUTPUT);
     digitalWrite(BOARD_POWER_ON_PIN, HIGH);
+    pinMode(BOARD_TFT_BL, OUTPUT);
+    digitalWrite(BOARD_TFT_BL, HIGH);
     //end savant code block
     tft.begin();
-
-
+    tft.writecommand(0x11);
     // Update Embed initialization parameters
     for (uint8_t i = 0; i < (sizeof(lcd_st7789v) / sizeof(lcd_cmd_t)); i++) {
         tft.writecommand(lcd_st7789v[i].cmd);
