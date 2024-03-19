@@ -44,7 +44,6 @@ TinyGPSPlus gps;
 #define AIO_SERVER  "io.adafruit.com"
 #define AIO_SERVERPORT  8883
 #define eepromsize 4096
-#define PIN_LED 25
 
 int ledState = LOW;
 
@@ -250,6 +249,7 @@ void setup() {
   Log.notice(F("****** setup complete ******" CR));
   rf.getModuleStatus();
   button.attachDoubleClick(doubleClick);
+  esp_sleep_enable_ext1_wakeup(((uint64_t)(((uint64_t)1) << BUTTON_1)), ESP_EXT1_WAKEUP_ANY_LOW);
   }
 
 uint32_t x=0;
@@ -362,7 +362,7 @@ void EnterSleep()
     //tft.print("EnterSleep"); 
     //tft.update();
     delay(2000);
-    esp_sleep_enable_ext1_wakeup(((uint64_t)(((uint64_t)1) << BUTTON_1)), ESP_EXT1_WAKEUP_ANY_LOW);
+    //
     esp_deep_sleep_start();
     /*Turn on power control*/
 }
