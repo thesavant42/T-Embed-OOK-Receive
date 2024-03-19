@@ -59,6 +59,7 @@
 void initTFT();
 void initHSPI();
 void setBrightness(uint8_t value);
+void setRotation(uint8_t rotation);
 
 extern TFT_eSPI tft;
 

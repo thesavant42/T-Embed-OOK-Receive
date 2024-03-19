@@ -7,6 +7,7 @@
 #include <ArduinoLog.h>
 // Load custom rtl_433_ESP, needs to be on HSPI, not VSPI (default)
 #include <rtl_433_ESP.h>
+#include <EEPROM.h>
 //added TFTHelper.h
 #include <vector>
 #include <TFT_eSPI.h>
@@ -22,15 +23,17 @@
 #include "secrets.h"
 #include <HardwareSerial.h>
 #include <TinyGPSPlus.h>
+#include <iostream>
+#include <string>
 
 
 static const uint32_t GPSBaud = 4800;
 //SoftwareSerial ss(43, 44); // RX, TX
 #define RXD2 44
 #define TXD2 43
+#define Publish FALSE
 
 TinyGPSPlus gps;
-
 
 #ifndef RF_MODULE_FREQUENCY
 #  define RF_MODULE_FREQUENCY 433.92
@@ -40,6 +43,13 @@ TinyGPSPlus gps;
 #define AA_FONT_SMALL "NotoSansBold15"
 #define AIO_SERVER  "io.adafruit.com"
 #define AIO_SERVERPORT  8883
+#define eepromsize 4096
+#define PIN_LED 25
+
+int ledState = LOW;
+
+OneButton button(BUTTON1, true);
+
 // io.adafruit.com root CA
 const char* adafruitio_root_ca = \
       "-----BEGIN CERTIFICATE-----\n"
@@ -71,7 +81,12 @@ const char* adafruitio_root_ca = \
       "-----END CERTIFICATE-----\n";
 
 
-String gpsLat, gpsLng;
+String gpsLat, gpsLng, payload, myLocation, Newpayload;
+
+
+
+void EnterSleep();
+
 
 // WiFiFlientSecure for SSL/TLS support
 WiFiClientSecure client;
@@ -90,8 +105,6 @@ Adafruit_MQTT_Client mqtt(&client, AIO_SERVER, AIO_SERVERPORT, AIO_USERNAME, AIO
 Adafruit_MQTT_Publish tembed = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/tembed");
 
 
-OneButton button(BOARD_ENCODE_CENTEN_PIN, true);
-
 //SemaphoreHandle_t radioLock;
 
 char messageBuffer[JSON_MSG_BUFFER];
@@ -99,6 +112,19 @@ char messageBuffer[JSON_MSG_BUFFER];
 rtl_433_ESP rf; // use -1 to disable transmitter
 
 int count = 0;
+
+// Handler function for a single click:
+static void handleClick() {
+  Serial.println("Clicked!");
+}
+
+void buttonLoop(void *)
+{
+    while (1) {
+        button.tick();
+        delay(5);
+    }
+}
 
 void rtl_433_Callback(char* message) {
   DynamicJsonBuffer jsonBuffer2(JSON_MSG_BUFFER);
@@ -108,6 +134,10 @@ void rtl_433_Callback(char* message) {
 }
 
 void logJson(JsonObject& jsondata) {
+  gpsLat = gps.location.lat(), 12;
+  gpsLng = gps.location.lng(), 12;
+  myLocation = gpsLat; myLocation += ","; myLocation += gpsLng;
+  /// myLocation; 
 #if defined(ESP8266) || defined(ESP32) || defined(__AVR_ATmega2560__) || defined(__AVR_ATmega1280__)
   char JSONmessageBuffer[jsondata.measureLength() + 1];
 #else
@@ -120,15 +150,18 @@ void logJson(JsonObject& jsondata) {
   Log.setShowLevel(true);
 #else
   Log.notice(F("Received message: %s" CR), JSONmessageBuffer);
-  gpsLat = String(gps.location.lat());
-  gpsLng = String(gps.location.lng());
-  Log.notice(F("Lat: %s"), gpsLat); Log.notice(","); Log.notice(F("Long: %s"), gpsLng);
+  //GPS Logs
+  Log.notice(F("Location: %s" CR), myLocation);
+  // clear the screen and prepare the tft for text
   tft.fillScreen(TFT_BLACK);
   tft.setCursor(0, 0, 4);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  // print message and location
   tft.println(JSONmessageBuffer);
-  tft.print(gps.location.lat(), 6); tft.print(F(",")); tft.print(gps.location.lng(), 6);;
-    
+  //tft.print(gps.location.lat(), 6); tft.print(F(",")); tft.print(gps.location.lng(), 6);
+  tft.print(myLocation);
+  
+  //// Begin ADAIO Logging Function
   //Serial.print(F("\nSending val "));
   //Serial.print(JSONmessageBuffer);
   //Serial.print(F(" to tembed feed..."));
@@ -138,13 +171,14 @@ void logJson(JsonObject& jsondata) {
   //  Serial.println(F("OK!"));
   //}
 
-  // wait a couple seconds to avoid rate limit
-  //delay(5000);
+   //wait a couple seconds to avoid rate limit
+  delay(5000);
 #endif
 }
 
 void setup() {
   Serial.begin(921600);
+  power_management();
   Serial2.begin(9600, SERIAL_8N1, RXD2, TXD2);
   delay(1000);
    Serial.println("Loopback program started");
@@ -158,8 +192,7 @@ void setup() {
   // ESP32 will crash if any of the fonts are missing
   bool font_missing = false;
   if (SPIFFS.exists("/NotoSansBold15.vlw")    == false) font_missing = true;
-  //if (SPIFFS.exists("/NotoSansBold36.vlw")    == false) font_missing = true;
-
+ 
   if (font_missing)
     {
       Serial.println("\r\nFont missing in SPIFFS, did you upload it?");
@@ -170,6 +203,7 @@ void setup() {
   initTFT();
   pinMode(BOARD_TFT_BL, OUTPUT);
   digitalWrite(BOARD_TFT_BL, HIGH);
+  tft.setRotation(1);
   tft.setCursor(0, 0, 4);
   tft.loadFont(AA_FONT_SMALL); // Must load the font first
   // Set the font colour to be white with a black background
@@ -208,7 +242,6 @@ void setup() {
   #endif
     Log.begin(LOG_LEVEL, &Serial);
 
-
   Log.notice(F(" " CR));
   Log.notice(F("****** setup ******" CR));
   rf.initReceiver(RF_MODULE_RECEIVER_GPIO, RF_MODULE_FREQUENCY);
@@ -216,7 +249,8 @@ void setup() {
   rf.enableReceiver();
   Log.notice(F("****** setup complete ******" CR));
   rf.getModuleStatus();
-}
+  button.attachDoubleClick(doubleClick);
+  }
 
 uint32_t x=0;
 
@@ -269,7 +303,8 @@ float step = stepMin;
 #endif
 
 void loop() {
-   // This sketch displays information every time a new sentence is correctly encoded.
+  button.tick();
+  // This loop displays information every time a new sentence is correctly encoded.
   while (Serial2.available() > 0)
     if (gps.encode(Serial2.read()))
       //displayInfo();
@@ -315,14 +350,21 @@ void loop() {
     // rf.getModuleStatus();
   }
 #endif
+ 
 }
+//}
 
-void buttonLoop(void *)
+void EnterSleep()
 {
-    while (1) {
-        button.tick();
-        delay(5);
-    }
+    //tft.setRotation(2);
+    delay(1000);
+    Serial.println("EnterSleep");
+    //tft.print("EnterSleep"); 
+    //tft.update();
+    delay(2000);
+    esp_sleep_enable_ext1_wakeup(((uint64_t)(((uint64_t)1) << BUTTON_1)), ESP_EXT1_WAKEUP_ANY_LOW);
+    esp_deep_sleep_start();
+    /*Turn on power control*/
 }
 
 // Function to connect and reconnect as necessary to the MQTT server.
@@ -403,3 +445,40 @@ void displayInfo()
 
   Serial.println();
 }
+
+void power_management() {
+  EEPROM.begin(eepromsize);
+  byte z = EEPROM.read(eepromsize-2);
+
+  if (digitalRead(BUTTON1) != LOW) {
+    if (z == 1){
+      go_deep_sleep();
+    }
+  } else {
+    if (z == 0) {
+      EEPROM.write(eepromsize-2, 1);
+      EEPROM.commit();
+      go_deep_sleep();
+    } else {
+      EEPROM.write(eepromsize-2, 0);
+      EEPROM.commit();
+    }
+  }
+}
+
+void go_deep_sleep() {
+  Serial.println("Going to sleep now");
+  esp_deep_sleep_start();
+}
+
+//void force_reset() {
+//  esp_task_wdt_init(1,true);
+//  esp_task_wdt_add(NULL);
+//  while(true);
+//}
+
+void doubleClick()
+{
+  Serial.println("x2 Enter Sleep");
+  EnterSleep();
+} // doubleClick
