@@ -13,14 +13,15 @@
 #include <TFT_eSPI.h>
 #include "TFTHelper.h"
 #include <OneButton.h>
-// SPIFFS fs for fonts
 #include <FS.h>
+#include "secrets.h"
 #include <WiFi.h>
 #include "WiFiClientSecure.h"
 // adafruitio
+
 #include "Adafruit_MQTT.h"
 #include "Adafruit_MQTT_Client.h"
-#include "secrets.h"
+// GPS
 #include <HardwareSerial.h>
 #include <TinyGPSPlus.h>
 #include <iostream>
@@ -32,6 +33,8 @@ static const uint32_t GPSBaud = 4800;
 #define RXD2 44
 #define TXD2 43
 #define Publish FALSE
+#define _HAS_SDCARD_
+#define _USE_SHARED_SPI_BUS_
 
 TinyGPSPlus gps;
 
@@ -100,9 +103,7 @@ Adafruit_MQTT_Client mqtt(&client, AIO_SERVER, AIO_SERVERPORT, AIO_USERNAME, AIO
 
 // Setup a feed called 'test' for publishing.
 // Notice MQTT paths for AIO follow the form: <username>/feeds/<feedname>
-
 Adafruit_MQTT_Publish tembed = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/tembed");
-
 
 //SemaphoreHandle_t radioLock;
 
@@ -128,15 +129,18 @@ void buttonLoop(void *)
 void rtl_433_Callback(char* message) {
   DynamicJsonBuffer jsonBuffer2(JSON_MSG_BUFFER);
   JsonObject& RFrtl_433_ESPdata = jsonBuffer2.parseObject(message);
+  Log.notice(F("debug - message: %s" CR), message);
   logJson(RFrtl_433_ESPdata);
   count++;
 }
 
 void logJson(JsonObject& jsondata) {
-  gpsLat = gps.location.lat(), 12;
-  gpsLng = gps.location.lng(), 12;
+  gpsLat = gps.location.lat(), 6;
+  gpsLng = gps.location.lng(), 6;
   myLocation = gpsLat; myLocation += ","; myLocation += gpsLng;
-  /// myLocation; 
+  jsondata["lat"] = gpsLat;
+  jsondata["lng"] = gpsLng;
+
 #if defined(ESP8266) || defined(ESP32) || defined(__AVR_ATmega2560__) || defined(__AVR_ATmega1280__)
   char JSONmessageBuffer[jsondata.measureLength() + 1];
 #else
@@ -148,33 +152,32 @@ void logJson(JsonObject& jsondata) {
   Log.notice(F("."));
   Log.setShowLevel(true);
 #else
-  Log.notice(F("Received message: %s" CR), JSONmessageBuffer);
+  Log.notice(F("RX: %s" CR), JSONmessageBuffer);
   //GPS Logs
-  Log.notice(F("Location: %s" CR), myLocation);
   // clear the screen and prepare the tft for text
   tft.fillScreen(TFT_BLACK);
   tft.setCursor(0, 0, 4);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
   // print message and location
   tft.println(JSONmessageBuffer);
-  //tft.print(gps.location.lat(), 6); tft.print(F(",")); tft.print(gps.location.lng(), 6);
-  tft.print(myLocation);
-  
-  //// Begin ADAIO Logging Function
-  //Serial.print(F("\nSending val "));
-  //Serial.print(JSONmessageBuffer);
-  //Serial.print(F(" to tembed feed..."));
-  //if (! tembed.publish(JSONmessageBuffer)) {
-  //  Serial.println(F("Failed"));
-  //} else {
-  //  Serial.println(F("OK!"));
-  //}
+  //
+  // Begin ADAIO Logging Function
+   Serial.print(F("\nSending val "));
+   Serial.print(JSONmessageBuffer);
+   Serial.print(F(" to tembed feed..."));
+   if (! tembed.publish(JSONmessageBuffer)) {
+     Serial.println(F("Failed"));
+     tft.println(F("Logging Failed"));
+    } else {
+      Serial.println(F("Logging OK!"));
+    }
 
-   //wait a couple seconds to avoid rate limit
-  delay(5000);
+  //wait a couple seconds to avoid rate limit
+  delay(2000);
 #endif
 }
 
+//
 void setup() {
   Serial.begin(921600);
   power_management();
@@ -214,8 +217,6 @@ void setup() {
   tft.setCursor(0, 0, 4);
   // init radios
   initHSPI();
-  // new changes
-  //Serial.begin(921600);
   Serial.println(); Serial.println();
   Serial.print("Connecting to ");
   Serial.println(WLAN_SSID);
@@ -247,6 +248,7 @@ void setup() {
   rf.setCallback(rtl_433_Callback, messageBuffer, JSON_MSG_BUFFER);
   rf.enableReceiver();
   Log.notice(F("****** setup complete ******" CR));
+  tft.println("*** setup complete ***");
   rf.getModuleStatus();
   button.attachDoubleClick(doubleClick);
   esp_sleep_enable_ext1_wakeup(((uint64_t)(((uint64_t)1) << BUTTON_1)), ESP_EXT1_WAKEUP_ANY_LOW);
@@ -350,7 +352,6 @@ void loop() {
     // rf.getModuleStatus();
   }
 #endif
- 
 }
 //}
 
@@ -400,9 +401,7 @@ void displayInfo()
   Serial.print(F("Location: ")); 
   if (gps.location.isValid())
   {
-    Serial.print(gps.location.lat(), 6);
-    Serial.print(F(","));
-    Serial.print(gps.location.lng(), 6);
+    Serial.print(gps.location.lat(), 6); Serial.print(F(",")); Serial.print(gps.location.lng(), 6);
   }
   else
   {
@@ -412,11 +411,7 @@ void displayInfo()
   Serial.print(F("  Date/Time: "));
   if (gps.date.isValid())
   {
-    Serial.print(gps.date.month());
-    Serial.print(F("/"));
-    Serial.print(gps.date.day());
-    Serial.print(F("/"));
-    Serial.print(gps.date.year());
+    Serial.print(gps.date.month()); Serial.print(F("/")); Serial.print(gps.date.day()); Serial.print(F("/")); Serial.print(gps.date.year());
   }
   else
   {
@@ -433,8 +428,7 @@ void displayInfo()
     Serial.print(gps.time.minute());
     Serial.print(F(":"));
     if (gps.time.second() < 10) Serial.print(F("0"));
-    Serial.print(gps.time.second());
-    Serial.print(F("."));
+    Serial.print(gps.time.second()); Serial.print(F("."));
     if (gps.time.centisecond() < 10) Serial.print(F("0"));
     Serial.print(gps.time.centisecond());
   }
@@ -471,14 +465,9 @@ void go_deep_sleep() {
   esp_deep_sleep_start();
 }
 
-//void force_reset() {
-//  esp_task_wdt_init(1,true);
-//  esp_task_wdt_add(NULL);
-//  while(true);
-//}
-
 void doubleClick()
 {
-  Serial.println("x2 Enter Sleep");
+  Serial.println("Double-click detected, Enter Sleep");
+  tft.println("Sleep mode!");
   EnterSleep();
 } // doubleClick
