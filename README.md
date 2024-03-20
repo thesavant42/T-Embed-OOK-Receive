@@ -2,6 +2,13 @@
 
 This is a sample implementation of the rtl_433_ESP library with the CC1101 Transceiver Module. This fork has been patched for the Lilygo T-Embed
 
+## ISM Band RF Stumbler
+
+The idea is to implement netstumbler-like discovery and mapping functionality, but for subghz radio in the ISM bands. ISM - (Industrial/Scientific/Medical) band radio traffic is found eminating from all sorts of devices. I acdidentally stumbled upon neighboring sensors while adding one to my Home Assistant lab and thought "Say, I could map that."
+
+The Lilygo T-Embed is a combination of their T-Display S3 esp32-s3 development board and a roatary encoder w/ RGB LEDs. Also built in are an i2s DAC, built in microSD, and an expansion module via a pogo-pin backpack with a TI CC1101 radio, NFC... There's even a grove i2c header, all for about $60. Quite a handy little development board!
+
+
 
 ## CC1101 Transceiver Module
 
@@ -97,6 +104,7 @@ N: Received message : {"model":"Acurite-Tower","id":2043,"channel":"B","battery_
 rtl_433_ESP(6): data_output {"model":"Acurite-Tower","id":2043,"channel":"B","battery_ok":1,"temperature_C":24.7,"humidity":84,"mic":"CHECKSUM","protocol":"Acurite 592TXR Temp/Humidity, 5n1 Weather Station, 6045 Lightning, 3N1, Atlas","rssi":-29,"duration":439000}
 N: Received message : {"model":"Acurite-Tower","id":2043,"channel":"B","battery_ok":1,"temperature_C":24.7,"humidity":84,"mic":"CHECKSUM","protocol":"Acurite 592TXR Temp/Humidity, 5n1 Weather Station, 6045 Lightning, 3N1, Atlas","rssi":-29,"duration":439000}
 rtl_433_ESP(6): # of messages decoded 2
+...
  
 rtl_433_ESP(6): Signal length: 215000, Gap length: 8389809, Signal RSSI: -55, train: 0, messageCount: 2, pulses: 162
 rtl_433_ESP(6): data_output {"model":"Acurite-Tower","id":5989,"channel":"A","battery_ok":1,"temperature_C":21.5,"humidity":127,"mic":"CHECKSUM","protocol":"Acurite 592TXR Temp/Humidity, 5n1 Weather Station, 6045 Lightning, 3N1, Atlas","rssi":-55,"duration":215000}
